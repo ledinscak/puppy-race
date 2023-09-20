@@ -1,8 +1,34 @@
 #!/usr/bin/env bash
 
 main() {
-    init
+    init_parameters
+    init_scene
+    while race; do
+        update
+        render
+        sleep "$TIME_IN_SECONDS"
+    done
+    declare_winner
+    press_key
+}
 
+init_parameters() {
+    source './frames.sh'
+    NUMBER_OF_FRAMES=2
+
+    WINDOW_WIDTH=$(tput cols)    
+    WINDOW_HEIGHT=$(tput lines)    
+    FINISH_DISTANCE=$(( WINDOW_WIDTH * 2 / 3 ))
+    DOGS=$(( WINDOW_HEIGHT / 7 ))
+    MAX_SPEED=$((FINISH_DISTANCE / 10))
+    DOG_WIDTH=
+    DOG_HEIGHT=$(( ${#frames[@]} / NUMBER_OF_FRAMES ))
+    TIME_IN_SECONDS=0.1
+    CURRENT_FRAME=0
+    for ((i=0; i<DOGS; i++)); do distances+=(""); done
+}
+
+init_scene() {
     tput civis # hide cursor
 
     echo -e "\e[2J"
@@ -11,49 +37,13 @@ main() {
 
     echo -e "\e[$((WINDOW_HEIGHT-3));${FINISH_DISTANCE}H\e[7m "
     echo -e "\e[$((WINDOW_HEIGHT-2));$((FINISH_DISTANCE-6))H \e[7mF I N I S H\e[0m"
-
-    while race; do
-        update
-        render
-        sleep "$PAUSE"
-    done
-
-    echo -n "WINNER: $(declareWinner)"
-    
-    while true; do
-        read -t 3 -n 1
-        [ $? = 0 ] && { tput cnorm; clear; exit 0; } # show cursor and exit
-    done
 }
 
-init() {
-    source './frames.sh'
-
-    WINDOW_WIDTH=$(tput cols)    
-    WINDOW_HEIGHT=$(tput lines)    
-    FINISH_DISTANCE=$(( WINDOW_WIDTH * 2 / 3 ))
-    MAX_SPEED=$((FINISH_DISTANCE / 10))
-    DOGS=$(( WINDOW_HEIGHT / 7 ))
-    NUMBER_OF_FRAMES=2
-    DOG_WIDTH=
-    DOG_HEIGHT=$(( ${#frames[@]} / NUMBER_OF_FRAMES ))
-    PAUSE=0.1
-    CURRENT_FRAME=0
-    for ((i=0; i<DOGS; i++)); do distances+=(""); done
-}
-
-render() {
-    echo -e "\e[2;0H"
-    for ((i=0; i<DOGS; i++)); do
-        for ((line=0; line<DOG_HEIGHT; line++)); do
-            line_index=$((DOG_HEIGHT*CURRENT_FRAME + line))
-            if [ "$line" -ne 2 ]; then 
-                echo "${distances[i]}${frames[line_index]}"
-            else
-                echo "${distances[i]}${frames[line_index]}" | tr 'N' "$((i + 1))"
-            fi
-        done 
-    done 
+race() {
+    for ((i=0; i<${#distances[@]}; i++)) {
+        [ "${#distances[i]}" -ge $((FINISH_DISTANCE - 24)) ] && return 1
+    }
+    return 0;
 }
 
 update() {
@@ -66,14 +56,21 @@ update() {
     done
 }
 
-race() {
-    for ((i=0; i<${#distances[@]}; i++)) {
-        [ "${#distances[i]}" -ge $((FINISH_DISTANCE - 24)) ] && return 1
-    }
-    return 0;
+render() {
+    echo -e "\e[2;0H"
+    for ((i=0; i<DOGS; i++)); do
+        for ((line=0; line<DOG_HEIGHT; line++)); do
+            line_index=$((DOG_HEIGHT*CURRENT_FRAME + line))
+            if [ "$line" -ne 2 ]; then 
+                echo "${distances[i]}${frames[line_index]}"
+            else
+                echo "${distances[i]}${frames[line_index]/N/$((i+1))}"
+            fi
+        done 
+    done 
 }
 
-declareWinner() {
+declare_winner() {
     local longest_distance=${#distances[0]}
     local winner=1
     for ((i=1; i<${#distances[@]}; i++)) {
@@ -82,8 +79,14 @@ declareWinner() {
             longest_distance="${#distances[i]}"
         fi
     }
-    echo $winner
+    echo -n "WINNER: $winner"
 }
 
+press_key() {
+    while true; do
+        read -t 3 -n 1
+        [ $? = 0 ] && { tput cnorm; clear; exit 0; } # show cursor and exit
+    done
+}
 
 main
