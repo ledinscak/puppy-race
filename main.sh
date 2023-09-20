@@ -6,22 +6,15 @@ main() {
     tput civis # hide cursor
 
     echo -e "\e[2J"
-    echo -e "\e[1;${FINISH}H \e[7mF I N I S H"
-    echo -e "\e[2;$((FINISH+6))H\e[7m "
+    echo -e "\e[1;$((FINISH_DISTANCE-6))H \e[7mF I N I S H"
+    echo -e "\e[2;${FINISH_DISTANCE}H\e[7m "
 
-    echo -e "\e[32;$((FINISH+6))H\e[7m "
-    echo -e "\e[33;${FINISH}H \e[7mF I N I S H\e[0m"
+    echo -e "\e[$((WINDOW_HEIGHT-3));${FINISH_DISTANCE}H\e[7m "
+    echo -e "\e[$((WINDOW_HEIGHT-2));$((FINISH_DISTANCE-6))H \e[7mF I N I S H\e[0m"
+
     while race; do
-        echo -e "\e[2;0H"
-        for ((i=0; i<${#distances[@]}; i++)) {
-            render "$i" "${distances[i]}" "${frame1[@]}"
-        }
-        sleep "$PAUSE"
         update
-        echo -e "\e[2;0H"
-        for ((i=0; i<${#distances[@]}; i++)) {
-            render "$i" "${distances[i]}" "${frame2[@]}"
-        }
+        render
         sleep "$PAUSE"
     done
 
@@ -35,28 +28,36 @@ main() {
 
 init() {
     source './frames.sh'
-    
-    FINISH=100
-    MAX_SPEED=9
+
+    WINDOW_WIDTH=$(tput cols)    
+    WINDOW_HEIGHT=$(tput lines)    
+    FINISH_DISTANCE=$(( WINDOW_WIDTH * 2 / 3 ))
+    MAX_SPEED=$((FINISH_DISTANCE / 10))
+    DOGS=$(( WINDOW_HEIGHT / 7 ))
+    NUMBER_OF_FRAMES=2
+    DOG_WIDTH=
+    DOG_HEIGHT=$(( ${#frames[@]} / NUMBER_OF_FRAMES ))
     PAUSE=0.1
-    distances=("" "" "" "" "")
+    CURRENT_FRAME=0
+    for ((i=0; i<DOGS; i++)); do distances+=(""); done
 }
 
 render() {
-    nr="$1"
-    local distance="$2"
-    shift 2
-    local arr=("$@")
-    for ((line=0; line<"${#arr[@]}"; line++)); do
-        if [ "$line" -ne 2 ]; then 
-            echo "${distance}${arr[line]}"
-        else
-            echo "${distance}${arr[line]}" | tr 'N' "$((nr + 1))"
-        fi
-    done
+    echo -e "\e[2;0H"
+    for ((i=0; i<DOGS; i++)); do
+        for ((line=0; line<DOG_HEIGHT; line++)); do
+            line_index=$((DOG_HEIGHT*CURRENT_FRAME + line))
+            if [ "$line" -ne 2 ]; then 
+                echo "${distances[i]}${frames[line_index]}"
+            else
+                echo "${distances[i]}${frames[line_index]}" | tr 'N' "$((i + 1))"
+            fi
+        done 
+    done 
 }
 
 update() {
+    CURRENT_FRAME=$(( (CURRENT_FRAME + 1) % 2 ))
     for ((i=0; i<${#distances[@]}; i++)); do
         move=$(( RANDOM % MAX_SPEED + 1 ))
         for ((j=0; j<"$move"; j++ )); do
@@ -67,7 +68,7 @@ update() {
 
 race() {
     for ((i=0; i<${#distances[@]}; i++)) {
-        [ "${#distances[i]}" -ge $((FINISH - 19)) ] && return 1
+        [ "${#distances[i]}" -ge $((FINISH_DISTANCE - 24)) ] && return 1
     }
     return 0;
 }
